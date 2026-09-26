@@ -168,6 +168,7 @@ class ReplayEngine:
             generator=self.research_generator,
             max_iters=3
         )
+        self.current_agent = research_agent
 
         with open(f"{GAM_path}/conv-{conv}/qa_results.json", 'r', encoding='utf-8') as file:
             items = json.load(file)
@@ -225,9 +226,9 @@ def main():
         nums = 1
         for item in items:
             print(f"========= conv:{conv}({nums}) =========")
+            replayer.current_agent = None
             try:
-                json_path = f"{GAM_path}/conv-{conv}/research_trace_q{nums}.json"
-                question, TRACE = Trace_str(json_path)
+                question = item.get("question", "")
                 # run one question + exp
                 qa_result, experience, total_tokens = replayer.run_replay_exp(question, conv, nums)
                 print("total_tokens:", total_tokens)
@@ -239,8 +240,18 @@ def main():
                 print(f"❌ Error at conv:{conv}({nums}) -> {e}")
                 import traceback
                 traceback.print_exc()
+                partial_tokens = getattr(replayer.current_agent, "total_tokens", 0)
+                TOKENS = TOKENS + partial_tokens
+                qa_results.append({
+                    "question": item.get("question", ""),
+                    "gold_answer": item.get("gold_answer", ""),
+                    "category": item.get("category"),
+                    "research_summary": "",
+                    "summary_answer": "",
+                    "iterations": 0,
+                    "error": str(e)
+                })
                 nums += 1
-                continue
         
         with open(f"{results_path}/{conv}/qa_results.json", "w", encoding="utf-8") as f:
             json.dump(qa_results, f, ensure_ascii=False, indent=2)
